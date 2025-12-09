@@ -4,88 +4,51 @@
 ```bash
 #!/bin/bash
 
-#############################################
-# Gemini API Bulk Checker - Ultra Version
-# Fitur:
-# ✔ Output ke valid.txt & invalid.txt
-# ✔ Multi-thread / parallel checking
-# ✔ Auto remove duplicate API keys
-# ✔ Progress bar
-#############################################
+INPUT_FILE="keys.txt"
 
-echo "=== Gemini API Bulk Checker Ultra ==="
-echo -n "Masukan nama file list API (misal: api.txt): "
-read INPUT_FILE
+# Warna-warna
+RED="\e[91m"
+GREEN="\e[92m"
+YELLOW="\e[93m"
+BLUE="\e[94m"
+RESET="\e[0m"
 
-# Cek file
-if [ ! -f "$INPUT_FILE" ]; then
-    echo "File tidak ditemukan!"
+if [[ ! -f "$INPUT_FILE" ]]; then
+    echo -e "${RED}File $INPUT_FILE tidak ditemukan!${RESET}"
     exit 1
 fi
 
-# Bersihkan output
-> valid.txt
-> invalid.txt
+echo -e "${BLUE}=== Bulk Gemini API Key Checker ===${RESET}"
 
-# Membuat file clean tanpa duplicate
-CLEAN_FILE="clean_api.txt"
-sort -u "$INPUT_FILE" > "$CLEAN_FILE"
+while IFS= read -r KEY; do
+    KEY=$(echo "$KEY" | xargs)  # trim whitespace
+    [[ -z "$KEY" ]] && continue # skip baris kosong
 
-TOTAL=$(wc -l < "$CLEAN_FILE")
-COUNT=0
+    echo -e "\n${YELLOW}Mengecek Key:${RESET} $KEY"
 
-# Tentukan jumlah parallel worker
-THREADS=20
-
-echo ""
-echo "Total API key unik: $TOTAL"
-echo "Menjalankan pengecekan dengan $THREADS thread..."
-echo ""
-
-# Fungsi pengecekan API
-check_key() {
-    KEY="$1"
-
-    RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+    RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$KEY" \
         -H "Content-Type: application/json" \
-        -H "x-goog-api-key: $KEY" \
-        "https://generativelanguage.googleapis.com/v1/models")
+        -d '{"contents":[{"parts":[{"text":"test"}]}]}' )
 
-    if [ "$RESPONSE" -eq 200 ]; then
-        echo "$KEY" >> valid.txt
-    else
-        echo "$KEY" >> invalid.txt
-    fi
-}
-
-export -f check_key
-
-# Jalankan parallel
-cat "$CLEAN_FILE" | xargs -n1 -P"$THREADS" -I{} bash -c 'check_key "$@"' _ {}
-
-# PROGRESS BAR SEDERHANA
-while true; do
-    VALID=$(wc -l < valid.txt)
-    INVALID=$(wc -l < invalid.txt)
-    DONE=$((VALID + INVALID))
-
-    PERCENT=$((DONE * 100 / TOTAL))
-
-    echo -ne "\rProgress: [$PERCENT%]  $DONE / $TOTAL  (Valid: $VALID | Invalid: $INVALID)"
-
-    if [ "$DONE" -ge "$TOTAL" ]; then
-        break
+    # Jika ada "candidates" berarti valid
+    if echo "$RESPONSE" | grep -q '"candidates"'; then
+        echo -e "${GREEN}VALID${RESET}"
+        continue
     fi
 
-    sleep 0.3
-done
+    # Ambil pesan error
+    ERROR_MSG=$(echo "$RESPONSE" | grep -o '"message": *"[^"]*"' | sed 's/"message": "//;s/"$//')
 
-echo ""
-echo "--------------------------------"
-echo "Selesai!"
-echo "Valid   tersimpan di: valid.txt"
-echo "Invalid tersimpan di: invalid.txt"
-echo "--------------------------------"
+    if [[ -z "$ERROR_MSG" ]]; then
+        ERROR_MSG="Unknown error"
+    fi
+
+    echo -e "${RED}ERROR: $ERROR_MSG${RESET}"
+
+done < "$INPUT_FILE"
+
+echo -e "\n${BLUE}Selesai mengecek semua key.${RESET}"
+
 ```
 
 ---
@@ -104,7 +67,7 @@ checker.sh
 chmod +x checker.sh
 ```
 
-### 3️⃣ Siapkan daftar API, contoh: `api.txt`
+### 3️⃣ Siapkan daftar API dalam file keys.txt`
 
 ```
 AIzaSyEXAMPLE1
@@ -116,22 +79,9 @@ AIzaSyEXAMPLE3
 
 ```bash
 ./checker.sh`
----
-Ketik nama file tempat Anda mentimpan key lalu Enter
 ```
+**Penempatan checker.sh dan keys.txt harus dalam satu folder**
 # ✨ Hasil Output
 
-### ➤ **valid.txt**
+![Bulk Gemini API Key Checker](https://raw.githubusercontent.com/hendynoize/Gemini-API-Key-Bulk-Checker/refs/heads/main/image.png)
 
-```
-AIzaSyEXAMPLE1
-```
-
-### ➤ **invalid.txt**
-
-```
-AIzaSyEXAMPLE2
-AIzaSyEXAMPLE3
-```
-
----
