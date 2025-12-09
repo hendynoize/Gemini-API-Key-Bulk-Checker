@@ -95,13 +95,13 @@ echo "--------------------------------"
 ### 1️⃣ Simpan script
 
 ```
-gemini-bulk-checker-ultra.sh
+checker.sh
 ```
 
 ### 2️⃣ Beri izin eksekusi
 
 ```bash
-chmod +x gemini-bulk-checker-ultra.sh
+chmod +x checker.sh
 ```
 
 ### 3️⃣ Siapkan daftar API, contoh: `api.txt`
@@ -115,11 +115,10 @@ AIzaSyEXAMPLE3
 ### 4️⃣ Jalankan
 
 ```bash
-./gemini-bulk-checker-ultra.sh
-```
-
+./checker.sh`
 ---
-
+Ketik nama file tempat Anda mentimpan key lalu Enter
+```
 # ✨ Hasil Output
 
 ### ➤ **valid.txt**
