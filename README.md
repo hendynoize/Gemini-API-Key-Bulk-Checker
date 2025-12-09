@@ -26,7 +26,7 @@ while IFS= read -r KEY; do
 
     echo -e "\n${YELLOW}Mengecek Key:${RESET} $KEY"
 
-    RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$KEY" \
+    RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=$KEY" \
         -H "Content-Type: application/json" \
         -d '{"contents":[{"parts":[{"text":"test"}]}]}' )
 
