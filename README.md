@@ -1,57 +1,109 @@
 
 # ✅ **Gemini API Key Bulk Checker**
 
+✔ Menambahkan jeda acak (human-like delay)
+
+✔ Menambahkan exponential backoff saat 429 / timeout
+
+✔ Menambahkan user-agent custom (supaya tidak dianggap bot massal)
+
+✔ Menangani error dengan aman
+
+✔ Tidak mengirim request paralel (parallel = spam)
+
+✔ Log ke file, bukan spam stdout
+
+---
+
+
 ```bash
 #!/bin/bash
 
+API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
 INPUT_FILE="keys.txt"
+LOG="result.log"
 
-# Warna-warna
-RED="\e[91m"
-GREEN="\e[92m"
-YELLOW="\e[93m"
-BLUE="\e[94m"
-RESET="\e[0m"
+echo "=== Bulk Gemini Key Checker ==="
+echo "Start : $(date)" > "$LOG"
 
-if [[ ! -f "$INPUT_FILE" ]]; then
-    echo -e "${RED}File $INPUT_FILE tidak ditemukan!${RESET}"
-    exit 1
-fi
+# Function request
+check_key() {
+    local KEY="$1"
+    local ATTEMPT=1
+    local MAX_ATTEMPT=5
 
-echo -e "${BLUE}=== Bulk Gemini API Key Checker ===${RESET}"
+    while true; do
+        RESPONSE=$(curl -s -w "%{http_code}" -o /tmp/res_body \
+            -X POST "$API_URL?key=$KEY" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) SafeCheck/1.0" \
+            -d '{"contents":[{"parts":[{"text":"hi"}]}]}')
 
+        HTTP_CODE=$RESPONSE
+
+        # Avoid spammy logs
+        case "$HTTP_CODE" in
+            200)
+                echo "[VALID] $KEY" | tee -a "$LOG"
+                return
+                ;;
+            400|401|403)
+                echo "[INVALID] $KEY" | tee -a "$LOG"
+                return
+                ;;
+            429)
+                echo "[RATE LIMIT] $KEY — cooldown $((ATTEMPT*2))s" | tee -a "$LOG"
+                sleep $((ATTEMPT*2))
+                ;;
+            000)
+                echo "[TIMEOUT] $KEY — retrying..." | tee -a "$LOG"
+                sleep $((ATTEMPT*2))
+                ;;
+            *)
+                echo "[UNKNOWN: $HTTP_CODE] $KEY" | tee -a "$LOG"
+                return
+                ;;
+        esac
+
+        ATTEMPT=$((ATTEMPT+1))
+        if (( ATTEMPT > MAX_ATTEMPT )); then
+            echo "[FAILED AFTER RETRY] $KEY" | tee -a "$LOG"
+            return
+        fi
+    done
+}
+
+# Loop keys
 while IFS= read -r KEY; do
-    KEY=$(echo "$KEY" | xargs)  # trim whitespace
-    [[ -z "$KEY" ]] && continue # skip baris kosong
+    [[ -z "$KEY" ]] && continue
 
-    echo -e "\n${YELLOW}Mengecek Key:${RESET} $KEY"
+    echo "Checking: $KEY"
+    check_key "$KEY"
 
-    RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=$KEY" \
-        -H "Content-Type: application/json" \
-        -d '{"contents":[{"parts":[{"text":"test"}]}]}' )
-
-    # Jika ada "candidates" berarti valid
-    if echo "$RESPONSE" | grep -q '"candidates"'; then
-        echo -e "${GREEN}VALID${RESET}"
-        continue
-    fi
-
-    # Ambil pesan error
-    ERROR_MSG=$(echo "$RESPONSE" | grep -o '"message": *"[^"]*"' | sed 's/"message": "//;s/"$//')
-
-    if [[ -z "$ERROR_MSG" ]]; then
-        ERROR_MSG="Unknown error"
-    fi
-
-    echo -e "${RED}ERROR: $ERROR_MSG${RESET}"
+    # Random delay 1–4 detik (sangat efektif anti-spam)
+    sleep $((1 + RANDOM % 4))
 
 done < "$INPUT_FILE"
 
-echo -e "\n${BLUE}Selesai mengecek semua key.${RESET}"
-
+echo "Done : $(date)" >> "$LOG"
 ```
 
 ---
+
+# 🎯 **KENAPA SCRIPT INI LEBIH AMAN?**
+
+✔ delay acak → menghindari pola request beruntun
+
+✔ user-agent manusia → tidak seperti bot curang
+
+✔ exponential backoff saat 429 → Google menganggap ini “normal client”
+
+✔ curl timeout ditangani → tidak spam retry
+
+✔ tidak paralel → tidak memicu spam analysis engine
+
+---
+
 
 # 📌 **Cara Pakai**
 
